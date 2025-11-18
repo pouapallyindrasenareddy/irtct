@@ -1,34 +1,54 @@
-pipeline {                                    // 1  // Defines the start of the Jenkins pipeline block
+pipeline {
+    agent any
 
-    agent any                                 // Specifies the pipeline can run on any available agent
+    tools {
+        maven 'MAVEN_HOME'       // Configure Maven in Jenkins -> Global Tool Config
+        jdk 'JAVA_HOME'          // Configure JDK in Jenkins -> Global Tool Config
+    }
 
-    environment {                             // 2  // Defines environment variables for the pipeline
-        PATH = "/opt/maven/bin:$PATH"         // Adds Maven's path to the system's PATH variable
-    }                                         // 2  // Ends the environment block
+    stages {
 
-    stages {                                  // 3  // Defines the stages block where multiple stages are declared
+        stage('Checkout Code') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/your-repo/your-project.git'
+            }
+        }
 
-        stage("build") {                      // 4  // Creates a stage named 'build'
-            steps {                           // 5  // Defines the steps that will be executed in this stage
-                echo "----------- build started ----------"  
-                                              // Logs a message indicating the start of the build
-                sh 'mvn clean deploy -Dmaven.test.skip=true'  
-                                              // Runs Maven clean and deploy commands, skipping tests
-                echo "----------- build completed ----------"  
-                                              // Logs a message indicating the build completion
-            }                                 // 5  // Ends the steps block for 'build' stage
-        }                                     // 4  // Ends the 'build' stage
+        stage('Build with Maven') {
+            steps {
+                sh "mvn clean install"
+            }
+        }
 
-        stage("test") {                       // 6  // Creates a stage named 'test'
-            steps {                           // 7  // Defines the steps that will be executed in this stage
-                echo "----------- unit test started ----------"  
-                                              // Logs a message indicating the start of unit tests
-                sh 'mvn surefire-report:report'  
-                                              // Runs the Maven Surefire report to execute unit tests
-                echo "----------- unit test completed ----------"  
-                                              // Logs a message indicating unit test completion
-            }                                 // 7  // Ends the steps block for 'test' stage
-        }                                     // 6  // Ends the 'test' stage
+        stage('Run Unit Tests') {
+            steps {
+                sh "mvn test"
+            }
 
-     }
-  }
+            post {
+                always {
+                    junit 'target/surefire-reports/*.xml'
+                }
+            }
+        }
+
+        stage('Package Artifact') {
+            steps {
+                sh "mvn package"
+            }
+            post {
+                success {
+                    archiveArtifacts artifacts: '**/target/*.jar', fingerprint: true
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo "Pipeline finished!"
+        }
+    }
+}
+
